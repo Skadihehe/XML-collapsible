@@ -1,24 +1,24 @@
 const { Plugin } = require('obsidian');
 
-class JsonCollapsiblePlugin extends Plugin {
+class XmlCollapsiblePlugin extends Plugin {
   async onload() {
-    console.log('Loading JSON Collapsible Plugin');
+    console.log('Loading XML Collapsible Plugin');
 
-    this.registerMarkdownCodeBlockProcessor('json', (source, el, ctx) => {
-      this.renderJsonTree(source, el);
+    this.registerMarkdownCodeBlockProcessor('xml', (source, el, ctx) => {
+      this.renderXmlTree(source, el);
     });
 
     this.addStyles();
   }
 
   onunload() {
-    console.log('Unloading JSON Collapsible Plugin');
+    console.log('Unloading XML Collapsible Plugin');
   }
 
   addStyles() {
     const style = document.createElement('style');
     style.textContent = `
-      .json-tree {
+      .xml-tree {
         font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
         font-size: 13px;
         line-height: 1.6;
@@ -27,17 +27,17 @@ class JsonCollapsiblePlugin extends Plugin {
         border-radius: 4px;
       }
 
-      .json-node {
+      .xml-node {
         margin-left: 20px;
       }
 
-      .json-line {
+      .xml-line {
         display: flex;
         align-items: flex-start;
         padding: 2px 0;
       }
 
-      .json-toggle {
+      .xml-toggle {
         cursor: pointer;
         user-select: none;
         width: 16px;
@@ -50,56 +50,56 @@ class JsonCollapsiblePlugin extends Plugin {
         flex-shrink: 0;
       }
 
-      .json-toggle:hover {
+      .xml-toggle:hover {
         color: var(--text-normal);
       }
 
-      .json-toggle.empty {
+      .xml-toggle.empty {
         visibility: hidden;
       }
 
-      .json-key {
+      .xml-key {
         color: var(--text-accent);
         font-weight: 500;
         margin-right: 4px;
       }
 
-      .json-colon {
+      .xml-colon {
         margin-right: 4px;
         color: var(--text-muted);
       }
 
-      .json-value {
+      .xml-value {
         color: var(--text-normal);
       }
 
-      .json-value.string {
+      .xml-value.string {
         color: var(--text-success);
       }
 
-      .json-value.number {
+      .xml-value.number {
         color: var(--text-warning);
       }
 
-      .json-value.boolean {
+      .xml-value.boolean {
         color: var(--color-blue);
       }
 
-      .json-value.null {
+      .xml-value.null {
         color: var(--text-faint);
         font-style: italic;
       }
 
-      .json-bracket {
+      .xml-bracket {
         color: var(--text-muted);
         margin-left: 4px;
       }
 
-      .json-collapsed {
+      .xml-collapsed {
         display: none;
       }
 
-      .json-count {
+      .xml-count {
         color: var(--text-faint);
         font-size: 0.9em;
         margin-left: 4px;
@@ -108,20 +108,28 @@ class JsonCollapsiblePlugin extends Plugin {
     document.head.appendChild(style);
   }
 
-  renderJsonTree(source, container) {
+  renderXmlTree(source, container) {
     try {
-      const data = JSON.parse(source);
-      const treeContainer = container.createDiv({ cls: 'json-tree' });
+      const parser = new DOMParser();
+      const data = parser.parseFromString(source, "application/xml");
+      const treeContainer = container.createDiv({ cls: 'xml-tree' });
       this.renderNode(data, treeContainer, '', true);
     } catch (e) {
-      container.createDiv({ text: `Invalid JSON: ${e.message}` });
+      container.createDiv({ text: `Invalid XML: ${e.message}` });
     }
   }
 
   renderNode(value, container, key = '', isRoot = false) {
-    const type = this.getType(value);
-    const line = container.createDiv({ cls: 'json-line' });
+    const line = container.createDiv({ cls: 'xml-line' });
 
+    // first line is of form <? .* ?>
+    const firstLineRegex = /<?.*?>/gm;
+    
+    // if line segment begins with "<WORD>"
+      // check if string segment contains more than one "<WORD>" tags
+        // if contains more than one, then it is a parent - so create new line
+      // else look for next </WORD>
+          // new line after </WORD>
     if (type === 'object' || type === 'array') {
       const isArray = type === 'array';
       const children = isArray ? value : Object.entries(value);
@@ -181,20 +189,6 @@ class JsonCollapsiblePlugin extends Plugin {
       const valueSpan = line.createSpan({ cls: `json-value ${type}` });
       valueSpan.textContent = this.formatValue(value, type);
     }
-  }
-
-  getType(value) {
-    if (value === null) return 'null';
-    if (Array.isArray(value)) return 'array';
-    if (typeof value === 'object') return 'object';
-    return typeof value;
-  }
-
-  formatValue(value, type) {
-    if (type === 'string') return `"${value}"`;
-    if (type === 'null') return 'null';
-    return String(value);
-  }
 }
 
-module.exports = JsonCollapsiblePlugin;
+module.exports = XmlCollapsiblePlugin;
