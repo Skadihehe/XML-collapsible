@@ -1,10 +1,10 @@
 {
-  "id": "json-collapsible",
-  "name": "JSON Collapsible",
+  "id": "xml-collapsible",
+  "name": "XML Collapsible",
   "version": "1.0.0",
   "minAppVersion": "0.15.0",
-  "description": "Display JSON data as collapsible trees in your notes.",
-  "author": "Niaz Morshed",
+  "description": "Display XML data as collapsible trees in your notes.",
+  "author": "Skadi Flint",
   "authorUrl": "",
   "isDesktopOnly": false
 
