@@ -109,86 +109,118 @@ class XmlCollapsiblePlugin extends Plugin {
   }
 
   renderXmlTree(source, container) {
-    try {
-      const parser = new DOMParser();
-      const data = parser.parseFromString(source, "application/xml");
-      const treeContainer = container.createDiv({ cls: 'xml-tree' });
-      this.renderNode(data, treeContainer, '', true);
-    } catch (e) {
-      container.createDiv({ text: `Invalid XML: ${e.message}` });
+    const parser = new DOMParser();
+    const data = parser.parseFromString(source.trim(), "application/xml");
+  
+    const parseError = data.querySelector("parsererror");
+    if (parseError) {
+      container.createDiv({
+        text: `Invalid XML: ${parseError.textContent.trim()}`
+      });
+      return;
     }
+  
+    const treeContainer = container.createDiv({ cls: "xml-tree" });
+  
+    const declaration = source.match(/^\s*<\?xml[\s\S]*?\?>/);
+    if (declaration) {
+      const line = treeContainer.createDiv({ cls: "xml-line" });
+      line.createSpan({ cls: "xml-toggle empty" });
+      line.createSpan({ cls: "xml-declaration", text: declaration[0].trim() });
+    }
+  
+    this.renderXmlNode(data.documentElement, treeContainer);
   }
-
-  renderNode(value, container, key = '', isRoot = false) {
-    const line = container.createDiv({ cls: 'xml-line' });
-
-    // first line is of form <? .* ?>
-    const firstLineRegex = /<?.*?>/gm;
-    
-    // if line segment begins with "<WORD>"
-      // check if string segment contains more than one "<WORD>" tags
-        // if contains more than one, then it is a parent - so create new line
-      // else look for next </WORD>
-          // new line after </WORD>
-    if (type === 'object' || type === 'array') {
-      const isArray = type === 'array';
-      const children = isArray ? value : Object.entries(value);
-      const isEmpty = children.length === 0;
-
-      const toggle = line.createSpan({ cls: 'json-toggle' });
-      toggle.textContent = isEmpty ? '' : '▼';
-      if (isEmpty) toggle.addClass('empty');
-
-      if (!isRoot && key) {
-        line.createSpan({ cls: 'json-key', text: `"${key}"` });
-        line.createSpan({ cls: 'json-colon', text: ':' });
-      }
-
-      const openBracket = isArray ? '[' : '{';
-      const closeBracket = isArray ? ']' : '}';
-
-      if (isEmpty) {
-        line.createSpan({ cls: 'json-bracket', text: openBracket + closeBracket });
-      } else {
-        line.createSpan({ cls: 'json-bracket', text: openBracket });
-        const count = line.createSpan({ cls: 'json-count', text: `${children.length} items` });
-        
-        const childrenContainer = container.createDiv({ cls: 'json-node' });
-
-        if (isArray) {
-          value.forEach((item, index) => {
-            this.renderNode(item, childrenContainer, String(index), false);
-          });
-        } else {
-          Object.entries(value).forEach(([k, v]) => {
-            this.renderNode(v, childrenContainer, k, false);
-          });
-        }
-
-        const closingLine = container.createDiv({ cls: 'json-line' });
-        closingLine.createSpan({ cls: 'json-toggle empty' });
-        closingLine.createSpan({ cls: 'json-bracket', text: closeBracket });
-
-        let isExpanded = true;
-        toggle.onclick = () => {
-          isExpanded = !isExpanded;
-          toggle.textContent = isExpanded ? '▼' : '▶';
-          childrenContainer.toggleClass('json-collapsed', !isExpanded);
-          closingLine.toggleClass('json-collapsed', !isExpanded);
-          count.toggleClass('json-collapsed', isExpanded);
-        };
-      }
-    } else {
-      line.createSpan({ cls: 'json-toggle empty' });
-      
-      if (key) {
-        line.createSpan({ cls: 'json-key', text: `"${key}"` });
-        line.createSpan({ cls: 'json-colon', text: ':' });
-      }
-
-      const valueSpan = line.createSpan({ cls: `json-value ${type}` });
-      valueSpan.textContent = this.formatValue(value, type);
+  
+  renderXmlNode(node, container) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent.trim();
+      if (!text) return;
+  
+      const line = container.createDiv({ cls: "xml-line" });
+      line.createSpan({ cls: "xml-toggle empty" });
+      line.createSpan({ cls: "xml-text", text });
+      return;
     }
+  
+    if (node.nodeType === Node.COMMENT_NODE) {
+      const line = container.createDiv({ cls: "xml-line" });
+      line.createSpan({ cls: "xml-toggle empty" });
+      line.createSpan({ cls: "xml-comment", text: `<!--${node.textContent}-->` });
+      return;
+    }
+  
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+  
+    const element = node;
+    const children = Array.from(element.childNodes).filter(child => {
+      return child.nodeType !== Node.TEXT_NODE || child.textContent.trim();
+    });
+  
+    const attrs = Array.from(element.attributes)
+      .map(attr => ` ${attr.name}="${attr.value}"`)
+      .join("");
+  
+    const line = container.createDiv({ cls: "xml-line" });
+  
+    const hasChildren = children.length > 0;
+    const hasSingleTextChild =
+      children.length === 1 && children[0].nodeType === Node.TEXT_NODE;
+  
+    const toggle = line.createSpan({ cls: "xml-toggle" });
+    toggle.textContent = hasChildren && !hasSingleTextChild ? "▼" : "";
+    if (!toggle.textContent) toggle.addClass("empty");
+  
+    if (!hasChildren) {
+      line.createSpan({
+        cls: "xml-tag",
+        text: `<${element.tagName}${attrs}/>`
+      });
+      return;
+    }
+  
+    if (hasSingleTextChild) {
+      line.createSpan({
+        cls: "xml-tag",
+        text: `<${element.tagName}${attrs}>`
+      });
+      line.createSpan({
+        cls: "xml-text",
+        text: children[0].textContent.trim()
+      });
+      line.createSpan({
+        cls: "xml-tag",
+        text: `</${element.tagName}>`
+      });
+      return;
+    }
+  
+    line.createSpan({
+      cls: "xml-tag",
+      text: `<${element.tagName}${attrs}>`
+    });
+  
+    const childrenContainer = container.createDiv({ cls: "xml-node" });
+  
+    children.forEach(child => {
+      this.renderXmlNode(child, childrenContainer);
+    });
+  
+    const closingLine = container.createDiv({ cls: "xml-line" });
+    closingLine.createSpan({ cls: "xml-toggle empty" });
+    closingLine.createSpan({
+      cls: "xml-tag",
+      text: `</${element.tagName}>`
+    });
+  
+    let isExpanded = true;
+    toggle.onclick = () => {
+      isExpanded = !isExpanded;
+      toggle.textContent = isExpanded ? "▼" : "▶";
+      childrenContainer.toggleClass("xml-collapsed", !isExpanded);
+      closingLine.toggleClass("xml-collapsed", !isExpanded);
+    };
+  }
 }
 
 module.exports = XmlCollapsiblePlugin;
